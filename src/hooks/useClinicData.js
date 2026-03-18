@@ -74,6 +74,54 @@ export const useAddPatient = () => {
   });
 };
 
+// Hook to delete a patient
+export const useDeletePatient = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (patientId) => {
+      const { error } = await supabase
+        .from("patients")
+        .delete()
+        .eq("id", patientId);
+
+      if (error) throw new Error(error.message);
+      return patientId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PATIENTS_KEY });
+    },
+    onError: (error) => {
+      console.error("Error deleting patient:", error.message);
+    },
+  });
+};
+
+// Hook to update a patient
+export const useUpdatePatient = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ patientId, updatedData }) => {
+      const { data, error } = await supabase
+        .from("patients")
+        .update(updatedData)
+        .eq("id", patientId)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: PATIENTS_KEY });
+      queryClient.invalidateQueries({ queryKey: PATIENT_KEY(data.id) });
+    },
+    onError: (error) => {
+      console.error("Error updating patient:", error.message);
+    },
+  });
+};
+
 // Hook to fetch a single patient with medical_history
 export const usePatient = (id) => {
   return useQuery({

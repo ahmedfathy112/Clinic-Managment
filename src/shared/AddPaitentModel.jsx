@@ -1,20 +1,60 @@
 import React, { useState } from "react";
 import { FiUser, FiX } from "react-icons/fi";
-import { useAddPatient } from "../hooks/useClinicData";
+import { useAddPatient, useUpdatePatient } from "../hooks/useClinicData";
 
-const AddPaitentModel = ({ isOpen, onClose }) => {
-  const [formData, setFormData] = useState({
-    patientName: "",
-    phoneCode: "",
-    phoneNumber: "",
-    age: "",
-    chronicDiseases: "",
-    gender: "",
-    medicalDiagnosis: "",
-  });
-  const [selectedDiseases, setSelectedDiseases] = useState([]);
+const AddPaitentModel = ({
+  isOpen,
+  onClose,
+  mode = "add",
+  patientData = null,
+}) => {
+  const [formData, setFormData] = useState(getInitialFormData());
+  const [selectedDiseases, setSelectedDiseases] =
+    useState(getInitialDiseases());
   const [successMessage, setSuccessMessage] = useState("");
   const addPatientMutation = useAddPatient();
+  const updatePatientMutation = useUpdatePatient();
+
+  function getInitialFormData() {
+    if (mode === "edit" && patientData) {
+      const phoneNumber =
+        patientData.phone?.replace(/^\+?[0-9]{1,3}/, "") || "";
+      const phoneCode = patientData.phone?.replace(phoneNumber, "") || "";
+
+      return {
+        patientName: patientData.full_name || "",
+        phoneCode: phoneCode || "",
+        phoneNumber: phoneNumber || "",
+        age: patientData.age || "",
+        chronicDiseases:
+          patientData.medical_histories?.[0]?.chronic_diseases || "",
+        gender: patientData.gender || "",
+        medicalDiagnosis:
+          patientData.medical_histories?.[0]?.previous_surgeries || "",
+      };
+    }
+    return {
+      patientName: "",
+      phoneCode: "",
+      phoneNumber: "",
+      age: "",
+      chronicDiseases: "",
+      gender: "",
+      medicalDiagnosis: "",
+    };
+  }
+
+  function getInitialDiseases() {
+    if (
+      mode === "edit" &&
+      patientData?.medical_histories?.[0]?.chronic_diseases
+    ) {
+      return patientData.medical_histories[0].chronic_diseases
+        .split(",")
+        .map((d) => d.trim());
+    }
+    return [];
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,7 +76,7 @@ const AddPaitentModel = ({ isOpen, onClose }) => {
     e.preventDefault();
     setSuccessMessage("");
 
-    const patientData = {
+    const newPatientData = {
       full_name: formData.patientName,
       phone: `${formData.phoneCode}${formData.phoneNumber}`,
       gender: formData.gender,
@@ -50,8 +90,22 @@ const AddPaitentModel = ({ isOpen, onClose }) => {
     };
 
     try {
-      await addPatientMutation.mutateAsync({ patientData, medicalHistoryData });
-      setSuccessMessage("تم إضافة المريض بنجاح!");
+      if (mode === "add") {
+        // Add new patient
+        await addPatientMutation.mutateAsync({
+          patientData: newPatientData,
+          medicalHistoryData,
+        });
+        setSuccessMessage("تم إضافة المريض بنجاح!");
+      } else if (mode === "edit" && patientData) {
+        // Update existing patient
+        await updatePatientMutation.mutateAsync({
+          patientId: patientData.id,
+          updatedData: newPatientData,
+        });
+        setSuccessMessage("تم تعديل بيانات المريض بنجاح!");
+      }
+
       // Clear form
       setFormData({
         patientName: "",
@@ -63,13 +117,14 @@ const AddPaitentModel = ({ isOpen, onClose }) => {
         medicalDiagnosis: "",
       });
       setSelectedDiseases([]);
+
       // Close modal after a delay
       setTimeout(() => {
         onClose();
         setSuccessMessage("");
       }, 2000);
     } catch (error) {
-      console.error("Error adding patient:", error);
+      console.error("Error managing patient:", error);
       // Error is handled in the hook
     }
   };
@@ -91,7 +146,9 @@ const AddPaitentModel = ({ isOpen, onClose }) => {
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <FiUser className="text-blue-500 text-2xl" />
-              <h3 className="font-bold text-lg">إضافة مريض جديد</h3>
+              <h3 className="font-bold text-lg">
+                {mode === "edit" ? "تعديل بيانات المريض" : "إضافة مريض جديد"}
+              </h3>
             </div>
             <button
               onClick={onClose}
@@ -245,22 +302,39 @@ const AddPaitentModel = ({ isOpen, onClose }) => {
                 type="button"
                 onClick={onClose}
                 className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                disabled={addPatientMutation.isPending}
+                disabled={
+                  mode === "add"
+                    ? addPatientMutation.isPending
+                    : updatePatientMutation.isPending
+                }
               >
                 إلغاء
               </button>
               <button
                 type="submit"
-                disabled={addPatientMutation.isPending}
+                disabled={
+                  mode === "add"
+                    ? addPatientMutation.isPending
+                    : updatePatientMutation.isPending
+                }
                 className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {addPatientMutation.isPending ? (
+                {mode === "add" ? (
+                  addPatientMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    "حفظ البيانات"
+                  )
+                ) : updatePatientMutation.isPending ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    جاري الحفظ...
+                    جاري التحديث...
                   </>
                 ) : (
-                  "حفظ البيانات"
+                  "تحديث البيانات"
                 )}
               </button>
             </div>
