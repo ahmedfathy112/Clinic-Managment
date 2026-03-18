@@ -27,10 +27,10 @@ const App = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-row" dir="rtl">
-      <div className="w-1/4 max-md:w-17.5">
+      <div className="w-1/4 max-md:w-10">
         <SideBar />
       </div>
-      <div className="w-3/4 max-md:w-[95%] p-4">
+      <div className="w-3/4 max-md:w-[98%] p-4">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/home" element={<HomePage />} />
